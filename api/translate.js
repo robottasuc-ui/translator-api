@@ -1,24 +1,15 @@
 export default async function handler(req, res) {
-  // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Метод не разрешён" });
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST")
+    return res.status(405).json({ error: "Method not allowed" });
 
   const { text, source, target } = req.body;
-
-  if (!text || !target) {
-    return res
-      .status(400)
-      .json({ error: "Введите текст и язык перевода" });
-  }
+  if (!text || !target)
+    return res.status(400).json({ error: "Missing data" });
 
   try {
     const url =
@@ -28,14 +19,26 @@ export default async function handler(req, res) {
     const r = await fetch(url);
     const data = await r.json();
 
-    const translatedText = data[0]
+    let variants = data[0]
       .map(item => item[0])
-      .join("");
+      .filter(Boolean);
 
-    return res.status(200).json({ translatedText });
+    // убираем формализм
+    const blacklist = [
+      "Greetings",
+      "Salutations",
+      "Good day"
+    ];
+
+    variants = variants.filter(v => !blacklist.includes(v));
+
+    // самый естественный перевод
+    const translatedText =
+      variants.sort((a, b) => a.length - b.length)[0];
+
+    res.status(200).json({ translatedText });
+
   } catch (e) {
-    return res.status(500).json({
-      error: "Ошибка соединения. Попробуйте позже"
-    });
+    res.status(500).json({ error: "Translation error" });
   }
 }
